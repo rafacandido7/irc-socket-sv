@@ -5,8 +5,7 @@ import time
 from collections import deque
 from _thread import *
 
-# Mensagem do Dia
-MOTD = '''servidor'''
+MOTD = '''SOCKER IRC SERVER v0.1'''
 
 class Cliente:
     def __init__(self, conn):
@@ -19,17 +18,23 @@ class Cliente:
         pass
 
 class Servidor:
-    def __init__(self, port=6667):
+    def __init__(self,host='localhost',  port=6667, debug=False):
         '''
         Sempre que precisar de uma estrutura de dados que poderá ser acessada em diferentes conexões,
         utilize apenas deque ou queue. Exemplo, para armazenar as conexões ativas:
         '''
         self.conns = deque()
         self.port = port
+        self.debug = False
+        self.host = host
+
 
     def run(self, conn):
         Cliente(conn)
+        self.conns.append(conn)
+        # send MODT msg
         pass
+
 
     def listen(self):
         '''

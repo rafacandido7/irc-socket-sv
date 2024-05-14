@@ -4,6 +4,8 @@
 import signal
 import socket
 
+# no irc, so o cliente salva historico
+
 class Cliente(Exception):
     def __init__(self):
         # Propriedades do cliente
