@@ -8,14 +8,43 @@ from _thread import *
 MOTD = '''SOCKER IRC SERVER v0.1'''
 
 class Cliente:
-    def __init__(self, conn):
+    
+    def __init__(self, conn, addr):
         self.conn = conn
+        self.addr = addr
+        self.buffer = ""
+        self.nome = None
+
 
     def receber_dados(self):
-        pass
+        try:
+            data = self.conn.recv(1024).decode('utf-8')
+            if not data:
+                return False
+            self.buffer += data
+            while '\r\n' in self.buffer:
+                line, self.buffer = self.buffer.split('\r\n', 1)
+                self.processar_comando(line)
+            return True
+        except error:
+            print(error)
+            return False
+        
+    def processar_comando(self, line):
+        print(f"Recebido de {self.addr}: {line}")
+        if line.startswith("NICK"):
+            self.nome = line.split(':')[1]
+            self.enviar_dados(f":{self.nome} NICK recebido\r\n")
+        elif line.startswith("QUIT"):
+            self.enviar_dados(f"Desconectando: {self.nome}\r\n")
+            self.conn.close()
 
     def enviar_dados(self, msg):
-        pass
+        try:
+            self.conn.sendall(msg.encode('utf-8'))
+        except error:
+            print(error)
+            self.conn.close()
 
 class Servidor:
     def __init__(self,host='localhost',  port=6667, debug=False):
@@ -29,10 +58,13 @@ class Servidor:
         self.host = host
 
 
-    def run(self, conn):
-        Cliente(conn)
-        self.conns.append(conn)
-        # send MODT msg
+    def run(self, conn, addr):
+        cliente = Cliente(conn, addr)
+        conn.send(MOTD.encode())
+        self.conns.append(cliente)
+        while cliente.receber_dados():
+            pass
+        self.conns.remove(cliente)
         pass
 
 
@@ -50,7 +82,7 @@ class Servidor:
         while True:
             print(f'Servidor aceitando conexões na porta {self.port}...')
             client, addr = _socket.accept()
-            start_new_thread(self.run, (client, ))
+            start_new_thread(self.run, (client, addr))
 
     def start(self):
         '''
@@ -62,6 +94,10 @@ class Servidor:
         while True:
             time.sleep(60)
             print('Servidor funcionando...')
+            
+    def message_of_the_day(self, msg):
+        print(f'MOTD: {msg}')
+        
 
 
 def main():
