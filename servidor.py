@@ -4,11 +4,12 @@ import socket
 import time
 from collections import deque
 from _thread import *
+from utils import *
 
 MOTD = '''SOCKER IRC SERVER v0.1'''
 
 class Cliente:
-    
+
     def __init__(self, conn, addr):
         self.conn = conn
         self.addr = addr
@@ -18,30 +19,32 @@ class Cliente:
 
     def receber_dados(self):
         try:
-            data = self.conn.recv(1024).decode('utf-8')
-            if not data:
-                return False
+            data = decode()
+            print(data)
             self.buffer += data
+
             while '\r\n' in self.buffer:
                 line, self.buffer = self.buffer.split('\r\n', 1)
                 self.processar_comando(line)
+
             return True
         except error:
             print(error)
             return False
-        
+
     def processar_comando(self, line):
-        print(f"Recebido de {self.addr}: {line}")
-        if line.startswith("NICK"):
-            self.nome = line.split(':')[1]
-            self.enviar_dados(f":{self.nome} NICK recebido\r\n")
-        elif line.startswith("QUIT"):
-            self.enviar_dados(f"Desconectando: {self.nome}\r\n")
-            self.conn.close()
+        print_receive(line)
+
+        # if line.startswith("NICK"):
+        #     self.nome = line.split(':')[1]
+        #     self.enviar_dados(f":{self.nome} NICK recebido\r\n")
+        # elif line.startswith("QUIT"):
+        #     self.enviar_dados(f"Desconectando: {self.nome}\r\n")
+        #     self.conn.close()
 
     def enviar_dados(self, msg):
         try:
-            self.conn.sendall(msg.encode('utf-8'))
+            self.conn.sendall(msg.encode())
         except error:
             print(error)
             self.conn.close()
@@ -54,16 +57,23 @@ class Servidor:
         '''
         self.conns = deque()
         self.port = port
-        self.debug = False
+        self.debug = debug
         self.host = host
 
 
     def run(self, conn, addr):
         cliente = Cliente(conn, addr)
-        conn.send(MOTD.encode())
+        # na primeira conexão, eu preciso esperar ele enviar as 2 mensagens? dai depois posso enviar o motd?
+
         self.conns.append(cliente)
-        while cliente.receber_dados():
-            pass
+
+        while True:
+            res = cliente.receber_dados()
+            conn.send(MOTD.encode())
+            print_send(MOTD)
+            if not res:
+                break
+
         self.conns.remove(cliente)
         pass
 
@@ -80,7 +90,7 @@ class Servidor:
         _socket.bind(('', self.port))
         _socket.listen(4096)
         while True:
-            print(f'Servidor aceitando conexões na porta {self.port}...')
+            print(f"\033[1m\033[94m SOCKET IRC SERVER \n\n Servidor aceitando conexões na porta {self.port}...\n\033[0m")
             client, addr = _socket.accept()
             start_new_thread(self.run, (client, addr))
 
@@ -93,12 +103,7 @@ class Servidor:
 
         while True:
             time.sleep(60)
-            print('Servidor funcionando...')
-            
-    def message_of_the_day(self, msg):
-        print(f'MOTD: {msg}')
-        
-
+            print("\033[1m\033[94m Servidor Funcionando...\n\033[0m")
 
 def main():
     s = Servidor(host='', port=6667, debug=True)
