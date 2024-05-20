@@ -19,7 +19,7 @@ class Cliente:
 
     def receber_dados(self):
         try:
-            data = decode()
+            data = decode(self.conn)
             print(data)
             self.buffer += data
 
