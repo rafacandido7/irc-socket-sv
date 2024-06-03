@@ -6,22 +6,24 @@ class Cliente:
     def __init__(self):
         self.sock = None
         self.connected = False
+        self.nickname = None
         self.log_file = "irc_log.txt"
 
-    def connect(self, server_ip, server_port=6667):
+    def connect(self, server_ip, server_port=6667, nickname="exemplo"):
+        self.nickname = nickname
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.connect((server_ip, server_port))
             self.connected = True
             print("Conectado ao servidor em", server_ip, "na porta", server_port)
-            self.send("NICK exemplo\r\n")
-            self.send("USER exemplo 0 * :exemplo\r\n")
+            self.send(f"NICK {self.nickname}\r\n")
+            self.send(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
             threading.Thread(target=self.receive_messages).start()
         except Exception as e:
             print("Erro ao conectar:", e)
             self.connected = False
             time.sleep(5)
-            self.connect(server_ip, server_port)  # Tentar reconectar
+            self.connect(server_ip, server_port, nickname)  # Tentar reconectar
 
     def send(self, msg):
         try:
@@ -59,9 +61,12 @@ class Cliente:
         if cmd == "/connect":
             if len(parts) > 1:
                 server_ip = parts[1]
-                self.connect(server_ip)
+                nickname = "exemplo"
+                if len(parts) > 2:
+                    nickname = parts[2]
+                self.connect(server_ip, nickname=nickname)
             else:
-                print("Usage: /connect <server_ip>")
+                print("Usage: /connect <server_ip> [nickname]")
         elif cmd == "/disconnect":
             self.send("QUIT :desconectar\r\n")
             self.close()
@@ -95,7 +100,7 @@ class Cliente:
             self.send("QUIT :sair\r\n")
             self.close()
         elif cmd == "/help":
-            print("/connect <server_ip>\n/disconnect\n/join <#channel>\n/leave <#channel>\n/msg <#channel|username> <message>\n/privmsg <user> <message>\n/quit\n/help")
+            print("/connect <server_ip> [nickname]\n/disconnect\n/join <#channel>\n/leave <#channel>\n/msg <#channel|username> <message>\n/privmsg <user> <message>\n/quit\n/help")
         else:
             print("Comando não reconhecido. Use /help para ver a lista de comandos.")
 
