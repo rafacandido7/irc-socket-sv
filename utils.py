@@ -12,7 +12,7 @@ def print_error(str):
 def decode(conn):
     return conn.recv(1024).decode().strip()
 
-def validate_nick(nick):
+def validar_nick(nick):
     if len(nick) > 9:
         return False
 
@@ -20,6 +20,18 @@ def validate_nick(nick):
         return False
 
     if not re.match("^[A-Za-z0-9_]*$", nick):
+        return False
+
+    return True
+
+def validar_nome_canal(nome_canal):
+    if len(nome_canal) > 63:
+        return False
+
+    if not nome_canal.startswith("#"):
+        return False
+
+    if not re.match("^#[A-Za-z0-9_]*$", nome_canal):
         return False
 
     return True

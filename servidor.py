@@ -15,30 +15,28 @@ class Cliente:
         self.addr = addr
         self.nick = None
 
-
     def receber_dados(self):
         try:
             data = decode(self.conn)
             print_receive(data)
-
             return data
-        except error:
-            print(error)
+        except Exception as e:
+            print(e)
             return False
 
     def enviar_mensagem(self, msg):
         try:
             print_send(msg)
             self.conn.sendall(msg.encode())
-        except error:
-            print(error)
+        except Exception as e:
+            print(e)
             self.conn.close()
 
     def enviar_mensagem_geral(self, msg):
         try:
             self.conn.sendall(msg.encode())
-        except error:
-            print(error)
+        except Exception as e:
+            print(e)
             self.conn.close()
 
     def enviar_pong(self, payload):
@@ -46,22 +44,19 @@ class Cliente:
 
 
 class Servidor:
-    def __init__(self,host='localhost',  port=6667, debug=False):
-        '''
-        Sempre que precisar de uma estrutura de dados que poderá ser acessada em diferentes conexões,
-        utilize apenas deque ou queue. Exemplo, para armazenar as conexões ativas:
-        '''
+    def __init__(self, host='localhost', port=6667, debug=False):
         self.conns = deque()
         self.port = port
         self.debug = debug
         self.host = 'localhost'
         self.clientes = []
         self.nicks = {}
+        self.canais = {}
 
 
     def run(self, conn, addr):
         cliente = Cliente(conn, addr)
-
+        self.clientes.append(cliente)
         while True:
             dados = cliente.receber_dados()
             while '\r\n' in dados:
@@ -74,9 +69,13 @@ class Servidor:
             self.processar_nick(cliente, dados.split()[1])
         elif dados.startswith('USER'):
             self.processar_user(cliente, dados.split()[1], dados.split(':')[1])
+        elif dados.startswith('PING'):
+            self.processar_ping(cliente, dados.split(':')[1])
+        elif dados.startswith('JOIN'):
+            self.processar_ping(cliente, dados.split(':')[1])
 
     def processar_nick(self, cliente, nick):
-        if not validate_nick(nick):
+        if not validar_nick(nick):
             cliente.enviar_mensagem(f"432 * {nick} :Erroneous Nickname\r\n")
         elif nick.lower() in self.nicks:
             cliente.enviar_mensagem(f"433 * {nick} :Nickname is already in use\r\n")
@@ -97,7 +96,6 @@ class Servidor:
         cliente.enviar_mensagem(f"375 {cliente.nick} : {self.host} - Message of the Day -\r\n")
         for line in MOTD.split('\n'):
             cliente.enviar_mensagem(f"372 {cliente.nick} :- {line}\r\n")
-
         cliente.enviar_mensagem(f"376 {cliente.nick} :End of /MOTD command.\r\n")
 
     def processar_user(self, cliente, username, realname):
@@ -106,6 +104,28 @@ class Servidor:
 
     def processar_ping(self, cliente, payload):
         cliente.enviar_pong(payload)
+
+    def processar_join(self, cliente, canal):
+        if not validar_nome_canal(canal):
+            cliente.enviar_mensagem(f":host 403 {cliente.nick} {canal} :No such channel\r\n")
+            return
+
+        if canal not in self.canais:
+            self.canais[canal] = []
+
+        self.canais[canal].append(cliente.nick)
+
+        cliente.enviar_mensagem(f":{cliente.nick} JOIN :{canal}\r\n")
+
+        lista_usuarios = ' '.join(self.canais[canal])
+        cliente.enviar_mensagem(f":host 353 {cliente.nick} = {canal} :{lista_usuarios}\r\n")
+        cliente.enviar_mensagem(f":host 366 {cliente.nick} {canal} :End of /NAMES list.\r\n")
+
+        for nick in self.canais[canal]:
+            if nick != cliente.nick:
+                outro_cliente = next((c for c in self.clientes if c.nick == nick), None)
+                if outro_cliente:
+                    outro_cliente.enviar_mensagem(f":{cliente.nick} JOIN :{canal}\r\n")
 
     def broadcast(self, mensagem):
         print_send(mensagem)
