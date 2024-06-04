@@ -10,7 +10,7 @@ def print_error(str):
     print(f"\033[91m{str}\033[0m")
 
 def decode(conn):
-    return conn.recv(1024).decode().strip()
+    return conn.recv(512).decode().strip()
 
 def validar_nick(nick):
     if len(nick) > 9:
@@ -25,6 +25,9 @@ def validar_nick(nick):
     return True
 
 def validar_nome_canal(nome_canal):
+    if not nome_canal:
+        return False
+
     if len(nome_canal) > 63:
         return False
 
