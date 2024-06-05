@@ -48,7 +48,7 @@ class Cliente:
         try:
             while len(msg) > 0:
                 part = msg[:512]
-                print_send(part)
+                print_send(f"GENERAL: {part}")
                 self.conn.sendall(part.encode())
                 msg = msg[512:]
         except Exception as e:
@@ -82,10 +82,7 @@ class Servidor:
         except Exception as e:
             print(e)
         finally:
-            self.clientes.remove(cliente)
-            if cliente.nick and cliente.nick.lower() in self.nicks:
-                del self.nicks[cliente.nick.lower()]
-            cliente.conn.close()
+            self.remover_cliente(cliente)
 
     def processar_comando(self, cliente, dados):
         partes = dados.split()
@@ -94,7 +91,7 @@ class Servidor:
 
         print(f"Partes: {partes}")
 
-        comando = partes[0]
+        comando = partes[0].upper()
 
         if comando == 'NICK' and len(partes) > 1:
             self.processar_nick(cliente, partes[1])
@@ -106,6 +103,15 @@ class Servidor:
             self.processar_ping(cliente, partes[1])
         elif comando == 'JOIN' and len(partes) > 1:
             self.processar_join(cliente, partes[1])
+        elif comando == 'PART' and len(partes) > 1:
+            canal = partes[1]
+            motivo = dados.split(':', 1)[1] if ':' in dados else ''
+            self.processar_part(cliente, canal, motivo)
+        elif comando == 'WHO' and len(partes) > 1:
+            self.processar_who(cliente, partes[1])
+        elif comando == 'QUIT':
+            motivo = dados.split(':', 1)[1] if ':' in dados else ''
+            self.processar_quit(cliente, motivo)
 
     def processar_nick(self, cliente, nick):
         if not validar_nick(nick):
@@ -159,6 +165,44 @@ class Servidor:
                 if outro_cliente:
                     outro_cliente.enviar_mensagem(f":{cliente.nick} JOIN :{canal}\r\n")
 
+    def processar_part(self, cliente, canal, motivo):
+        if canal not in self.canais or cliente.nick not in self.canais[canal]:
+            cliente.enviar_mensagem(f":{self.host} 442 {cliente.nick} {canal} :You’re not on that channel\r\n")
+            return
+
+        self.canais[canal].remove(cliente.nick)
+        mensagem = f":{cliente.nick} PART {canal} :{motivo}\r\n"
+        self.broadcast(mensagem)
+
+        if len(self.canais[canal]) == 0:
+            del self.canais[canal]
+
+    def processar_who(self, cliente, canal):
+        print('processar WHO')
+
+    def processar_quit(self, cliente, motivo):
+        mensagem = f":{cliente.nick} QUIT :{motivo}\r\n"
+        self.broadcast(mensagem, cliente)
+        self.remover_cliente(cliente, motivo)
+
+    def remover_cliente(self, cliente, motivo='Client Quit'):
+        if cliente in self.clientes:
+            self.clientes.remove(cliente)
+
+        if cliente.nick and cliente.nick.lower() in self.nicks:
+            del self.nicks[cliente.nick.lower()]
+
+        for canal in list(self.canais):
+            if cliente.nick in self.canais[canal]:
+                self.canais[canal].remove(cliente.nick)
+                self.broadcast(f":{cliente.nick} PART {canal} :{motivo}\r\n")
+
+                if len(self.canais[canal]) == 0:
+                    del self.canais[canal]
+
+        cliente.conn.close()
+
+
     def broadcast(self, mensagem, sender=None):
         print_send(mensagem)
         for cliente in self.clientes:
@@ -171,7 +215,7 @@ class Servidor:
         _socket.bind(('', self.port))
         _socket.listen(4096)
         while True:
-            print(f"\033[1m\033[94m SOCKET IRC SERVER \n\n Servidor aceitando conexões na porta {self.port}...\n\033[0m")
+            print(f"\033[1m\033[94mSOCKER IRC SERVER \n\nServidor aceitando conexões na porta {self.port}...\n\033[0m")
             client, addr = _socket.accept()
             start_new_thread(self.run, (client, addr))
 
@@ -179,7 +223,7 @@ class Servidor:
         start_new_thread(self.listen, ())
         while True:
             time.sleep(60)
-            print("\033[1m\033[94m Servidor Funcionando...\n\033[0m")
+            print("\033[1m\033[94mServidor Funcionando...\n\033[0m")
 
 def main():
     s = Servidor(host='', port=6667, debug=True)
