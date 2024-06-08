@@ -107,7 +107,7 @@ class Servidor:
             canal = partes[1]
             motivo = dados.split(':', 1)[1] if ':' in dados else ''
             self.processar_part(cliente, canal, motivo)
-        elif comando == 'WHO' and len(partes) > 1:
+        elif comando == 'WHO' or comando == 'NAMES' and len(partes) > 1:
             self.processar_who(cliente, partes[1])
         elif comando == 'QUIT':
             motivo = dados.split(':', 1)[1] if ':' in dados else ''
@@ -155,9 +155,7 @@ class Servidor:
         self.canais[canal].append(cliente.nick)
         cliente.enviar_mensagem(f":{cliente.nick} JOIN :{canal}\r\n")
 
-        lista_usuarios = ' '.join(self.canais[canal])
-        cliente.enviar_mensagem(f":{self.host} 353 {cliente.nick} = {canal} :{lista_usuarios}\r\n")
-        cliente.enviar_mensagem(f":{self.host} 366 {cliente.nick} {canal} :End of /NAMES list.\r\n")
+        self.usuarios_no_canal(cliente, canal)
 
         for nick in self.canais[canal]:
             if nick != cliente.nick:
@@ -178,7 +176,7 @@ class Servidor:
             del self.canais[canal]
 
     def processar_who(self, cliente, canal):
-        print('processar WHO')
+        self.usuarios_no_canal(cliente, canal)
 
     def processar_quit(self, cliente, motivo):
         mensagem = f":{cliente.nick} QUIT :{motivo}\r\n"
@@ -202,6 +200,10 @@ class Servidor:
 
         cliente.conn.close()
 
+    def usuarios_no_canal(self, cliente, canal):
+        lista_usuarios = ' '.join(self.canais[canal])
+        cliente.enviar_mensagem(f":{self.host} 353 {cliente.nick} = {canal} :{lista_usuarios}\r\n")
+        cliente.enviar_mensagem(f":{self.host} 366 {cliente.nick} {canal} :End of /NAMES list.\r\n")
 
     def broadcast(self, mensagem, sender=None):
         print_send(mensagem)
