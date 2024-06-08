@@ -63,7 +63,7 @@ class Servidor:
         self.conns = deque()
         self.port = port
         self.debug = debug
-        self.host = 'localhost'
+        self.host = host
         self.clientes = []
         self.nicks = {}
         self.canais = {}
@@ -108,15 +108,18 @@ class Servidor:
             motivo = dados.split(':', 1)[1] if ':' in dados else ''
             self.processar_part(cliente, canal, motivo)
         elif comando == 'WHO' or comando == 'NAMES' and len(partes) > 1:
-            self.processar_who(cliente, partes[1])
+            self.processar_names(cliente, partes[1])
+        elif comando == 'PRIVMSG' and len(partes) > 2:
+            self.processar_privmsg(cliente, partes[1], " ".join(partes[2:]))
         elif comando == 'QUIT':
             motivo = dados.split(':', 1)[1] if ':' in dados else ''
             self.processar_quit(cliente, motivo)
 
     def processar_nick(self, cliente, nick):
+        nick = nick.lower()
         if not validar_nick(nick):
             cliente.enviar_mensagem(f"432 * {nick} :Erroneous Nickname\r\n")
-        elif nick.lower() in self.nicks:
+        elif nick in self.nicks:
             cliente.enviar_mensagem(f"433 * {nick} :Nickname is already in use\r\n")
         else:
             if cliente.nick:
@@ -155,11 +158,9 @@ class Servidor:
         self.canais[canal].append(cliente.nick)
         cliente.enviar_mensagem(f":{cliente.nick} JOIN :{canal}\r\n")
 
-        self.usuarios_no_canal(cliente, canal)
-
         for nick in self.canais[canal]:
             if nick != cliente.nick:
-                outro_cliente = next((c for c in self.clientes if c.nick == nick), None)
+                outro_cliente = self.nicks.get(nick, None)
                 if outro_cliente:
                     outro_cliente.enviar_mensagem(f":{cliente.nick} JOIN :{canal}\r\n")
 
@@ -170,18 +171,38 @@ class Servidor:
 
         self.canais[canal].remove(cliente.nick)
         mensagem = f":{cliente.nick} PART {canal} :{motivo}\r\n"
-        self.broadcast(mensagem)
+        self.broadcast(mensagem, None)
 
         if len(self.canais[canal]) == 0:
             del self.canais[canal]
 
-    def processar_who(self, cliente, canal):
+    def processar_names(self, cliente, canal):
         self.usuarios_no_canal(cliente, canal)
 
     def processar_quit(self, cliente, motivo):
         mensagem = f":{cliente.nick} QUIT :{motivo}\r\n"
         self.broadcast(mensagem, cliente)
-        self.remover_cliente(cliente, motivo)
+        self.remover_cliente(cliente)
+
+    def processar_privmsg(self, cliente, destino, mensagem):
+        destino = destino.lower()
+        mensagem = mensagem.strip()
+
+        if destino.startswith('#'):
+            if destino in self.canais:
+                for nick in self.canais[destino]:
+                    outro_cliente = self.nicks.get(nick, None)
+                    if outro_cliente and outro_cliente != cliente:
+                        outro_cliente.enviar_mensagem(f":{cliente.nick} PRIVMSG {destino} :{mensagem}\r\n")
+            else:
+                cliente.enviar_mensagem(f":{self.host} 403 {cliente.nick} {destino} :No such channel\r\n")
+        else:
+            # bonuses hehe :)
+            outro_cliente = self.nicks.get(destino, None)
+            if outro_cliente:
+                outro_cliente.enviar_mensagem(f":{cliente.nick} PRIVMSG {destino} :{mensagem}\r\n")
+            else:
+                cliente.enviar_mensagem(f":{self.host} 401 {cliente.nick} {destino} :No such nick/channel\r\n")
 
     def remover_cliente(self, cliente, motivo='Client Quit'):
         if cliente in self.clientes:
