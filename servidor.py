@@ -60,6 +60,7 @@ class Cliente:
 
 class Servidor:
     def __init__(self, host='localhost', port=6667, debug=False):
+        self.commands = {'NICK', 'USER', 'PING', 'JOIN', 'PART', 'WHO', 'NAMES', 'PRIVMSG', 'QUIT'}
         self.conns = deque()
         self.port = port
         self.debug = debug
@@ -89,49 +90,62 @@ class Servidor:
         if len(partes) == 0:
             return
 
-        print(f"Partes: {partes}")
-
         comando = partes[0].upper()
 
-        if comando == 'NICK' and len(partes) > 1:
-            self.processar_nick(cliente, partes[1])
-        elif comando == 'USER' and len(partes) > 4:
-            username = partes[1]
-            realname = dados.split(':', 1)[1] if ':' in dados else ''
-            self.processar_user(cliente, username, realname)
-        elif comando == 'PING' and len(partes) > 1:
-            self.processar_ping(cliente, partes[1])
-        elif comando == 'JOIN' and len(partes) > 1:
-            self.processar_join(cliente, partes[1])
-        elif comando == 'PART' and len(partes) > 1:
-            canal = partes[1]
-            motivo = dados.split(':', 1)[1] if ':' in dados else ''
-            self.processar_part(cliente, canal, motivo)
-        elif comando == 'WHO' or comando == 'NAMES' and len(partes) > 1:
-            self.processar_names(cliente, partes[1])
-        elif comando == 'PRIVMSG' and len(partes) > 2:
-            self.processar_privmsg(cliente, partes[1], " ".join(partes[2:]))
-        elif comando == 'QUIT':
-            motivo = dados.split(':', 1)[1] if ':' in dados else ''
-            self.processar_quit(cliente, motivo)
+        if comando in self.commands:
+            if comando == 'NICK' and len(partes) > 1:
+                self.processar_nick(cliente, partes[1])
+            elif comando == 'USER' and len(partes) > 4:
+                username = partes[1]
+                realname = dados.split(':', 1)[1] if ':' in dados else ''
+                self.processar_user(cliente, username, realname)
+            elif comando == 'PING' and len(partes) > 1:
+                self.processar_ping(cliente, partes[1])
+            elif comando == 'JOIN' and len(partes) > 1:
+                self.processar_join(cliente, partes[1])
+            elif comando == 'PART' and len(partes) > 1:
+                canal = partes[1]
+                motivo = dados.split(':', 1)[1] if ':' in dados else ''
+                self.processar_part(cliente, canal, motivo)
+            elif (comando == 'WHO' or comando == 'NAMES') and len(partes) > 1:
+                self.processar_names(cliente, partes[1])
+            elif comando == 'PRIVMSG' and len(partes) > 2:
+                self.processar_privmsg(cliente, partes[1], " ".join(partes[2:]))
+            elif comando == 'QUIT':
+                motivo = dados.split(':', 1)[1] if ':' in dados else ''
+                self.processar_quit(cliente, motivo)
+        else:
+            if comando == 'CAP':
+                return
+            cliente.enviar_mensagem(f":{self.host} 421 {cliente.nick} {comando} :Unknown command\r\n")
 
     def processar_nick(self, cliente, nick):
         nick = nick.lower()
         if not validar_nick(nick):
             cliente.enviar_mensagem(f"432 * {nick} :Erroneous Nickname\r\n")
-        elif nick in self.nicks:
+        elif nick in self.nicks and self.nicks[nick] != cliente:
             cliente.enviar_mensagem(f"433 * {nick} :Nickname is already in use\r\n")
         else:
-            if cliente.nick:
-                del self.nicks[cliente.nick.lower()]
-                mensagem = f":{cliente.nick} NICK {nick}\r\n"
-                self.broadcast(mensagem, cliente)
-            else:
-                cliente.enviar_mensagem(f"001 {nick} :Welcome to the Internet Relay Network {nick}\r\n")
-                cliente.nick = nick
-                self.enviar_motd(cliente)
+            old_nick = cliente.nick
+            if old_nick:
+                del self.nicks[old_nick.lower()]
+                for canal, membros in self.canais.items():
+                    if old_nick in membros:
+                        membros.remove(old_nick)
+                        membros.append(nick)
+                        self.notify_channel_nickname_change(canal, old_nick, nick)
+
             cliente.nick = nick
-            self.nicks[nick.lower()] = cliente
+            self.nicks[nick] = cliente
+            cliente.enviar_mensagem(f"001 {nick} :Welcome to the Internet Relay Network {nick}\r\n" if not old_nick else f":{old_nick} NICK {nick}\r\n")
+            self.enviar_motd(cliente)
+
+    def notify_channel_nickname_change(self, canal, old_nick, new_nick):
+        message = f":{old_nick} NICK {new_nick}\r\n"
+        for member in self.canais[canal]:
+            member_cliente = self.nicks.get(member)
+            if member_cliente:
+                member_cliente.enviar_mensagem(message)
 
     def enviar_motd(self, cliente):
         cliente.enviar_mensagem(f"375 {cliente.nick} : {self.host} - Message of the Day -\r\n")
