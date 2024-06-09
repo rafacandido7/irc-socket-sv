@@ -9,21 +9,19 @@ class Cliente:
         self.nickname = None
         self.log_file = "irc_log.txt"
 
-    def connect(self, server_ip, server_port=6667, nickname="exemplo"):
+    def connect(self, server_ip, server_port=6667, nickname="luca_exemplo"):
         self.nickname = nickname
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.connect((server_ip, server_port))
             self.connected = True
-            print("Conectado ao servidor em", server_ip, "na porta", server_port)
+            print(f"Conectado ao servidor em {server_ip} na porta {server_port}")
             self.send(f"NICK {self.nickname}\r\n")
             self.send(f"USER {self.nickname} 0 * :{self.nickname}\r\n")
             threading.Thread(target=self.receive_messages).start()
         except Exception as e:
             print("Erro ao conectar:", e)
             self.connected = False
-            time.sleep(5)
-            self.connect(server_ip, server_port, nickname)  # Tentar reconectar
 
     def send(self, msg):
         try:
@@ -55,18 +53,24 @@ class Cliente:
         print("Conexão encerrada")
 
     def handle_command(self, command):
-        parts = command.split(' ', 2)
+        parts = command.split(' ', 3)
         cmd = parts[0]
 
         if cmd == "/connect":
             if len(parts) > 1:
                 server_ip = parts[1]
-                nickname = "exemplo"
+                server_port = 6667
+                nickname = "luca_exemplo"
                 if len(parts) > 2:
-                    nickname = parts[2]
-                self.connect(server_ip, nickname=nickname)
+                    try:
+                        server_port = int(parts[2])
+                    except ValueError:
+                        print("Porta inválida. Usando porta padrão 6667.")
+                if len(parts) > 3:
+                    nickname = parts[3]
+                self.connect(server_ip, server_port, nickname)
             else:
-                print("Usage: /connect <server_ip> [nickname]")
+                print("Uso: /connect <server_ip> [port] [nickname]")
         elif cmd == "/disconnect":
             self.send("QUIT :desconectar\r\n")
             self.close()
@@ -75,32 +79,32 @@ class Cliente:
                 channel = parts[1]
                 self.send(f"JOIN {channel}\r\n")
             else:
-                print("Usage: /join <#channel>")
+                print("Uso: /join <#channel>")
         elif cmd == "/leave":
             if len(parts) > 1:
                 channel = parts[1]
                 self.send(f"PART {channel}\r\n")
             else:
-                print("Usage: /leave <#channel>")
+                print("Uso: /leave <#channel>")
         elif cmd == "/msg":
             if len(parts) > 2:
                 target = parts[1]
                 message = parts[2]
                 self.send(f"PRIVMSG {target} :{message}\r\n")
             else:
-                print("Usage: /msg <#channel|username> <message>")
+                print("Uso: /msg <#channel|username> <mensagem>")
         elif cmd == "/privmsg":
             if len(parts) > 2:
                 user = parts[1]
                 message = parts[2]
                 self.send(f"PRIVMSG {user} :{message}\r\n")
             else:
-                print("Usage: /privmsg <user> <message>")
+                print("Uso: /privmsg <usuário> <mensagem>")
         elif cmd == "/quit":
             self.send("QUIT :sair\r\n")
             self.close()
         elif cmd == "/help":
-            print("/connect <server_ip> [nickname]\n/disconnect\n/join <#channel>\n/leave <#channel>\n/msg <#channel|username> <message>\n/privmsg <user> <message>\n/quit\n/help")
+            print("/connect <server_ip> [port] [nickname]\n/disconnect\n/join <#channel>\n/leave <#channel>\n/msg <#channel|username> <mensagem>\n/privmsg <user> <mensagem>\n/quit\n/help")
         else:
             print("Comando não reconhecido. Use /help para ver a lista de comandos.")
 
