@@ -10,7 +10,7 @@ class Cliente:
         self.log_file = "irc_log.txt"
 
     def connect(self, server_ip, server_port=6667, nickname="luca"):
-        self.nickname = nickname
+        self.nickname = nickname  # Define o nickname aqui
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.connect((server_ip, server_port))
@@ -53,7 +53,7 @@ class Cliente:
         print("Conexão encerrada")
 
     def handle_command(self, command):
-        parts = command.split(' ', 2)  # Ajustado para garantir que a mensagem seja capturada corretamente
+        parts = command.split(' ', 3)  # Ajustado para garantir que a mensagem seja capturada corretamente
         cmd = parts[0]
 
         if cmd == "/connect":
@@ -93,6 +93,12 @@ class Cliente:
                 self.send(f"PRIVMSG {target} :{message}\r\n")
             else:
                 print("Uso: /msg <#channel|username> <mensagem>")
+        elif cmd == "/names":
+            if len(parts) > 1:
+                channel = parts[1]
+                self.send(f"NAMES {channel}\r\n")
+            else:
+                print("Uso: /names <#channel>")
         elif cmd == "/privmsg":
             if len(parts) > 2:
                 user = parts[1]
@@ -104,7 +110,7 @@ class Cliente:
             self.send("QUIT :sair\r\n")
             self.close()
         elif cmd == "/help":
-            print("/connect <server_ip> [port] [nickname]\n/disconnect\n/join <#channel>\n/leave <#channel>\n/msg <#channel|username> <mensagem>\n/privmsg <user> <mensagem>\n/quit\n/help")
+            print("/connect <server_ip> [port] [nickname]\n/disconnect\n/join <#channel>\n/leave <#channel>\n/msg <#channel|username> <mensagem>\n/names <#channel>\n/privmsg <user> <mensagem>\n/quit\n/help")
         else:
             print("Comando não reconhecido. Use /help para ver a lista de comandos.")
 
