@@ -6,11 +6,12 @@ class Cliente:
     def __init__(self):
         self.sock = None
         self.connected = False
-        self.nickname = None
+        self.nickname = "nick_padrao"
         self.log_file = "irc_log.txt"
 
-    def connect(self, server_ip, server_port=6667, nickname="luca"):
-        self.nickname = nickname  # Define o nickname aqui
+    def connect(self, server_ip, server_port=6667, nickname=None):
+        if nickname:
+            self.nickname = nickname
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.connect((server_ip, server_port))
@@ -53,14 +54,14 @@ class Cliente:
         print("Conexão encerrada")
 
     def handle_command(self, command):
-        parts = command.split(' ', 3)  # Ajustado para garantir que a mensagem seja capturada corretamente
+        parts = command.split(' ', 3) 
         cmd = parts[0]
 
         if cmd == "/connect":
             if len(parts) > 1:
                 server_ip = parts[1]
                 server_port = 6667
-                nickname = "luca"
+                nickname = None
                 if len(parts) > 2:
                     try:
                         server_port = int(parts[2])
