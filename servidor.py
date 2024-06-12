@@ -191,7 +191,14 @@ class Servidor:
             del self.canais[canal]
 
     def processar_names(self, cliente, canal):
-        self.usuarios_no_canal(cliente, canal)
+        if canal.startswith('#'):
+            canal = canal.lower()
+            if canal in self.canais and cliente.nick in self.canais[canal]:
+                self.usuarios_no_canal(cliente, canal)
+            else:
+                cliente.enviar_mensagem(f":{self.host} 442 {cliente.nick} {canal} :You're not on that channel\r\n")
+        else:
+            cliente.enviar_mensagem(f":{self.host} 403 {cliente.nick} :No such channel\r\n")
 
     def processar_quit(self, cliente, motivo):
         mensagem = f":{cliente.nick} QUIT :{motivo}\r\n"
