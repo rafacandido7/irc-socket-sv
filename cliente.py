@@ -54,7 +54,7 @@ class Cliente:
         print("Conexão encerrada")
 
     def handle_command(self, command):
-        parts = command.split(' ', 3) 
+        parts = command.split(' ', 3)
         cmd = parts[0]
 
         if cmd == "/connect":
